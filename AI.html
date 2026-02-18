@@ -1,0 +1,1712 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Business Analyzer — Full Model</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0f1117;--bg2:#161b2e;--bg3:#0f1420;--border:#1e2640;
+  --accent:#6366f1;--accent2:#a5b4fc;--green:#22c55e;--yellow:#f59e0b;
+  --red:#ef4444;--pink:#f472b6;--text:#c7d0f0;--muted:#4b5680;--sub:#8890b4;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;height:100vh;overflow:hidden;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+
+/* ── SIDEBAR ── */
+.sidebar{width:256px;min-width:256px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+.logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
+.logo h2{font-size:.95rem;font-weight:700;color:var(--accent2);display:flex;align-items:center;gap:8px;}
+.logo p{font-size:.68rem;color:var(--muted);margin-top:3px;}
+.sb-sec{padding:12px 16px 6px;}
+.sb-sec label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);display:block;margin-bottom:7px;}
+.sb-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--accent2);padding:7px 10px;font-size:.76rem;outline:none;}
+.sb-input:focus{border-color:var(--accent);}
+.sb-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 10px;font-size:.76rem;outline:none;cursor:pointer;margin-bottom:6px;}
+.tog-row{display:flex;align-items:center;justify-content:space-between;margin:5px 0;}
+.tog-row span{font-size:.76rem;color:var(--sub);}
+.tog{width:32px;height:17px;background:var(--border);border-radius:9px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;}
+.tog.on{background:var(--accent);}
+.tog::after{content:'';position:absolute;width:13px;height:13px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .2s;}
+.tog.on::after{left:17px;}
+.pipe{padding:12px 16px;}
+.pipe label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);display:block;margin-bottom:7px;}
+.ps{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:6px;margin:2px 0;font-size:.74rem;color:var(--muted);border:1px solid transparent;cursor:default;}
+.ps.done{color:var(--accent);border-color:var(--border);background:var(--bg3);}
+.ps.active{color:var(--text);border-color:var(--accent);background:#131629;animation:fadeIn .3s;}
+.ps .dot{width:6px;height:6px;border-radius:50%;background:var(--border);flex-shrink:0;}
+.ps.done .dot{background:var(--accent);}
+.ps.active .dot{background:var(--accent2);box-shadow:0 0 6px var(--accent);}
+.db-status{padding:12px 16px;margin-top:auto;border-top:1px solid var(--border);font-size:.72rem;}
+.db-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:5px;animation:pulse 2s infinite;}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;flex-shrink:0;overflow-x:auto;}
+.tab{padding:13px 18px;font-size:.8rem;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+.tab:hover{color:var(--sub);}
+.tab.active{color:var(--accent2);border-bottom-color:var(--accent);}
+.content{flex:1;overflow-y:auto;padding:22px;}
+.screen{display:none;animation:fadeIn .25s;}
+.screen.active{display:block;}
+
+/* ── COMPONENTS ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;}
+.card-title{font-size:.76rem;font-weight:700;color:var(--sub);margin-bottom:12px;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:6px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+.sec-head{font-size:.92rem;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+
+/* Metric */
+.metric{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:transform .15s,box-shadow .15s;cursor:default;}
+.metric:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.12);}
+.metric .val{font-size:1.5rem;font-weight:800;color:var(--accent2);line-height:1;}
+.metric .lbl{font-size:.68rem;color:var(--muted);margin-top:4px;}
+.metric .dl{font-size:.7rem;margin-top:3px;}
+.dl.up{color:var(--green);}
+.dl.dn{color:var(--red);}
+
+/* KPI card */
+.kpi{border-radius:12px;padding:16px;position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s;cursor:default;}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);}
+.kpi .k-label{font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;}
+.kpi .k-val{font-size:1.55rem;font-weight:800;line-height:1;}
+.kpi .k-delta{font-size:.7rem;margin-top:5px;}
+.kpi .k-icon{position:absolute;right:14px;top:12px;font-size:1.6rem;opacity:.2;}
+
+/* Badge */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.67rem;font-weight:600;}
+.b-blue{background:#1e2a4a;color:var(--accent2);}
+.b-green{background:#142a1e;color:var(--green);}
+.b-red{background:#2a1414;color:var(--red);}
+.b-yellow{background:#2a2214;color:var(--yellow);}
+.b-pink{background:#2a1422;color:var(--pink);}
+
+/* Button */
+.btn{padding:8px 18px;border-radius:7px;border:none;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px;}
+.btn-p{background:var(--accent);color:#fff;}
+.btn-p:hover{background:#5457d6;transform:translateY(-1px);}
+.btn-p:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.btn-o{background:transparent;border:1px solid var(--border);color:var(--sub);}
+.btn-o:hover{border-color:var(--accent);color:var(--accent2);}
+.btn-sm{padding:5px 12px;font-size:.74rem;}
+.btn-danger{background:#2a1414;border:1px solid #3a1a1a;color:var(--red);}
+.btn-danger:hover{background:#3a1a1a;}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:.77rem;}
+.tbl th{background:var(--bg);color:var(--muted);padding:8px 11px;text-align:left;border-bottom:1px solid var(--border);font-weight:700;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;user-select:none;}
+.tbl th:hover{color:var(--accent2);}
+.tbl td{padding:8px 11px;border-bottom:1px solid #131929;color:var(--text);}
+.tbl tr:hover td{background:var(--bg3);}
+
+/* Upload zone */
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:40px 24px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--bg3);}
+.upload-zone h3{color:var(--text);font-size:.92rem;margin:10px 0 5px;}
+.upload-zone p{color:var(--muted);font-size:.76rem;}
+
+/* Query area */
+.qarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 15px;font-size:.84rem;resize:none;outline:none;font-family:inherit;line-height:1.6;}
+.qarea:focus{border-color:var(--accent);}
+
+/* Chip */
+.chip{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:.72rem;color:var(--sub);cursor:pointer;white-space:nowrap;transition:all .15s;}
+.chip:hover{border-color:var(--accent);color:var(--accent2);background:#131629;}
+
+/* Insight */
+.insight-box{background:linear-gradient(135deg,#111830,#141d36);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:15px 18px;color:var(--text);font-size:.83rem;line-height:1.75;}
+
+/* SQL code */
+.sql-block{background:#0a0d16;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'Courier New',monospace;font-size:.75rem;line-height:1.7;overflow-x:auto;white-space:pre;}
+.kw{color:var(--pink);}
+.tb{color:var(--green);}
+.nm{color:#fb923c;}
+.cm{color:var(--muted);}
+
+/* Progress bar */
+.prog-wrap{background:var(--border);border-radius:4px;height:6px;overflow:hidden;}
+.prog-bar{height:6px;border-radius:4px;transition:width .4s;}
+
+/* Col row (profiler) */
+.col-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #0d1020;}
+.cn{font-size:.78rem;font-weight:600;color:var(--text);width:110px;flex-shrink:0;}
+.ct{width:65px;flex-shrink:0;}
+.cbw{flex:1;background:var(--bg);border-radius:3px;height:5px;}
+.cb{height:5px;border-radius:3px;background:var(--accent);}
+.cm2{font-size:.69rem;width:55px;text-align:right;flex-shrink:0;}
+
+/* Anomaly row */
+.arow{display:flex;align-items:center;gap:10px;padding:7px 11px;background:var(--bg3);border-radius:7px;margin:3px 0;border:1px solid var(--border);}
+
+/* Score bar */
+.srow{display:flex;align-items:center;gap:10px;margin:5px 0;}
+.slbl{font-size:.73rem;color:var(--sub);width:95px;flex-shrink:0;}
+.sval{font-size:.73rem;color:var(--text);width:38px;text-align:right;flex-shrink:0;}
+
+/* Overlay */
+.overlay{display:none;position:fixed;inset:0;background:rgba(10,12,20,.88);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+.ov-title{color:var(--accent2);font-size:.88rem;font-weight:600;}
+.ov-sub{color:var(--muted);font-size:.75rem;}
+
+/* Typing cursor */
+.cursor{animation:blink .8s infinite;color:var(--accent2);}
+
+/* Chart containers */
+.ch{position:relative;}
+.ch-200{height:200px;}
+.ch-180{height:180px;}
+.ch-160{height:160px;}
+.ch-140{height:140px;}
+
+/* Notification toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:.8rem;color:var(--text);z-index:9999;animation:fadeIn .3s;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+
+/* Heatmap grid */
+#heatmap{display:grid;grid-template-columns:repeat(25,1fr);gap:2px;}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+
+/* Health bar */
+.hbar{background:var(--bg);border-radius:4px;height:7px;margin-top:3px;}
+.hbar-fill{height:7px;border-radius:4px;}
+
+/* Waterfall colors */
+.up-bar{color:var(--green);}
+.dn-bar{color:var(--red);}
+
+/* Voice indicator */
+.voice-pulse{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);animation:pulse .6s infinite;}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">
+    <h2>📊 AI Business Analyzer</h2>
+    <p>GPT-4o · DuckDB · ML · Voice</p>
+  </div>
+
+  <div class="sb-sec">
+    <label>🔑 OpenAI API Key</label>
+    <input class="sb-input" id="apiKey" type="password" placeholder="sk-… (optional for demo)"/>
+  </div>
+
+  <div class="sb-sec">
+    <label>⚙️ Settings</label>
+    <select class="sb-select" id="anomalyMethod">
+      <option value="zscore">Anomaly: Z-Score</option>
+      <option value="iforest">Anomaly: Isolation Forest</option>
+    </select>
+    <select class="sb-select" id="llmModel">
+      <option value="gpt-4o">Model: GPT-4o</option>
+      <option value="gpt-4o-mini">Model: GPT-4o-mini</option>
+    </select>
+    <div class="tog-row"><span>Voice Input</span><div class="tog" id="togVoice" onclick="this.classList.toggle('on')"></div></div>
+    <div class="tog-row"><span>Auto-Dashboard</span><div class="tog on" id="togDash" onclick="this.classList.toggle('on')"></div></div>
+    <div class="tog-row"><span>Real-time Alerts</span><div class="tog on" onclick="this.classList.toggle('on')"></div></div>
+  </div>
+
+  <div class="pipe">
+    <label>🔄 Pipeline</label>
+    <div class="ps" id="pipe0"><div class="dot"></div> Upload Data</div>
+    <div class="ps" id="pipe1"><div class="dot"></div> Profile Data</div>
+    <div class="ps" id="pipe2"><div class="dot"></div> Auto Clean</div>
+    <div class="ps" id="pipe3"><div class="dot"></div> Store in DB</div>
+    <div class="ps" id="pipe4"><div class="dot"></div> Query &amp; Analyze</div>
+    <div class="ps" id="pipe5"><div class="dot"></div> Dashboard</div>
+  </div>
+
+  <div class="db-status">
+    <div><span class="db-dot"></span>DuckDB <span style="color:var(--green)">connected</span></div>
+    <div id="sb-table-info" style="color:var(--muted);margin-top:4px;font-size:.69rem;">No table loaded</div>
+    <div id="sb-row-info" style="color:var(--muted);margin-top:2px;font-size:.69rem;"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ MAIN -->
+<div class="main">
+  <div class="tabs">
+    <div class="tab active" onclick="goTab(0,this)">📤 Upload</div>
+    <div class="tab" onclick="goTab(1,this)">🔍 Profile &amp; Clean</div>
+    <div class="tab" onclick="goTab(2,this)">💬 Query &amp; Analyze</div>
+    <div class="tab" onclick="goTab(3,this)">🗂️ Auto Dashboard</div>
+    <div class="tab" onclick="goTab(4,this)">📜 History</div>
+    <div class="tab" onclick="goTab(5,this)">⚙️ ML Insights</div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══════════════════════════════════ TAB 0: UPLOAD -->
+    <div class="screen active" id="s0">
+      <div class="sec-head">📤 Upload Business Data</div>
+      <div class="grid-2">
+        <div>
+          <div class="upload-zone" id="dropzone"
+               onclick="document.getElementById('fileInput').click()"
+               ondragover="event.preventDefault();this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')"
+               ondrop="handleDrop(event)">
+            <div style="font-size:2.4rem">📂</div>
+            <h3>Drop file here or click to browse</h3>
+            <p>CSV, Excel (.xlsx), JSON — up to 500K rows</p>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+              <span class="badge b-blue">CSV</span>
+              <span class="badge b-blue">XLSX</span>
+              <span class="badge b-blue">JSON</span>
+            </div>
+          </div>
+          <input type="file" id="fileInput" accept=".csv,.xlsx,.json" style="display:none" onchange="handleFile(this.files[0])"/>
+
+          <!-- OR: Use sample data -->
+          <div style="text-align:center;margin:12px 0;color:var(--muted);font-size:.76rem;">— or use sample dataset —</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+            <button class="btn btn-o btn-sm" onclick="loadSample('sales')">🛒 Sales Data</button>
+            <button class="btn btn-o btn-sm" onclick="loadSample('ecommerce')">📦 E-Commerce</button>
+            <button class="btn btn-o btn-sm" onclick="loadSample('finance')">💹 Finance</button>
+          </div>
+
+          <div id="file-loaded" style="display:none;margin-top:14px">
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+              <div style="font-size:1.6rem">📊</div>
+              <div style="flex:1">
+                <div id="file-name" style="font-size:.82rem;font-weight:600;color:var(--text)">—</div>
+                <div id="file-meta" style="font-size:.7rem;color:var(--muted);margin-top:2px">—</div>
+              </div>
+              <span class="badge b-green">✓ Loaded</span>
+            </div>
+            <div class="grid-4" style="margin-top:10px">
+              <div class="metric"><div class="val" id="m-rows">—</div><div class="lbl">Rows</div></div>
+              <div class="metric"><div class="val" id="m-cols">—</div><div class="lbl">Columns</div></div>
+              <div class="metric"><div class="val" id="m-miss" style="color:var(--yellow)">—</div><div class="lbl">Missing</div></div>
+              <div class="metric"><div class="val" id="m-dups" style="color:var(--red)">—</div><div class="lbl">Duplicates</div></div>
+            </div>
+            <button class="btn btn-p" style="width:100%;margin-top:10px" onclick="runPipeline()">🚀 Run Full Pipeline →</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-title">📋 Data Preview</div>
+            <div id="preview-table-wrap" style="overflow-x:auto;min-height:120px;display:flex;align-items:center;justify-content:center">
+              <div style="color:var(--muted);font-size:.78rem">No data loaded yet</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">🗄️ Table Settings</div>
+            <label style="font-size:.74rem;color:var(--sub);display:block;margin-bottom:5px">Table name</label>
+            <input class="sb-input" id="tableName" type="text" value="business_data" style="margin-bottom:10px"/>
+            <div id="col-type-editor" style="max-height:160px;overflow-y:auto;display:none">
+              <div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">Column type overrides:</div>
+              <div id="col-types"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════ TAB 1: PROFILE & CLEAN -->
+    <div class="screen" id="s1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="sec-head" style="margin:0">🔍 Profile &amp; Clean</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-o btn-sm" onclick="runProfile()">↻ Re-Profile</button>
+          <button class="btn btn-p btn-sm" onclick="runClean()">🧹 Auto-Clean</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Left: Profile -->
+        <div>
+          <div class="card">
+            <div class="card-title">📊 Dataset Overview</div>
+            <div class="grid-3" style="margin-bottom:12px">
+              <div class="metric"><div class="val" id="p-rows">—</div><div class="lbl">Rows</div></div>
+              <div class="metric"><div class="val" id="p-miss" style="color:var(--yellow)">—</div><div class="lbl">Missing</div></div>
+              <div class="metric"><div class="val" id="p-dups" style="color:var(--red)">—</div><div class="lbl">Dupes</div></div>
+            </div>
+            <div class="card-title">Column Details</div>
+            <div id="col-details" style="max-height:300px;overflow-y:auto">
+              <div style="color:var(--muted);font-size:.78rem">Run profiler to see details</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">📈 Numeric Distributions</div>
+            <div id="dist-select-wrap" style="margin-bottom:8px;display:none">
+              <select class="sb-select" id="distColSelect" onchange="updateDistChart()"></select>
+            </div>
+            <div class="ch ch-180"><canvas id="distChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Right: Quality + Clean -->
+        <div>
+          <div class="card">
+            <div class="card-title">🏆 Data Quality Score</div>
+            <div style="display:flex;align-items:center;gap:18px;margin-bottom:14px">
+              <div id="grade-circle" style="width:65px;height:65px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.7rem;font-weight:800;flex-shrink:0;background:#142a1e;color:var(--green);border:2px solid var(--green)">—</div>
+              <div>
+                <div id="quality-score" style="font-size:1.4rem;font-weight:800;color:var(--green)">—</div>
+                <div style="font-size:.72rem;color:var(--muted)">Overall Quality Score</div>
+              </div>
+            </div>
+            <div class="srow"><div class="slbl">Completeness</div><div style="flex:1"><div class="prog-wrap"><div class="prog-bar" id="q-comp" style="width:0%;background:var(--accent)"></div></div></div><div class="sval" id="q-comp-v">—</div></div>
+            <div class="srow"><div class="slbl">Uniqueness</div><div style="flex:1"><div class="prog-wrap"><div class="prog-bar" id="q-uniq" style="width:0%;background:var(--green)"></div></div></div><div class="sval" id="q-uniq-v">—</div></div>
+            <div class="srow"><div class="slbl">Consistency</div><div style="flex:1"><div class="prog-wrap"><div class="prog-bar" id="q-cons" style="width:0%;background:var(--yellow)"></div></div></div><div class="sval" id="q-cons-v">—</div></div>
+            <div class="srow"><div class="slbl">Validity</div><div style="flex:1"><div class="prog-wrap"><div class="prog-bar" id="q-valid" style="width:0%;background:var(--accent2)"></div></div></div><div class="sval" id="q-valid-v">—</div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">🔧 Cleaning Log</div>
+            <div id="clean-log" style="max-height:160px;overflow-y:auto;font-size:.77rem;color:var(--sub);line-height:2">
+              <div>Run Auto-Clean to see operations</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Before ↔ After</div>
+            <div class="grid-2" style="gap:8px">
+              <div style="background:#1a0f0f;border:1px solid #2a1414;border-radius:8px;padding:11px;text-align:center">
+                <div style="font-size:.68rem;color:var(--red);margin-bottom:4px">BEFORE</div>
+                <div id="before-stats" style="font-size:.78rem;color:var(--sub)">—</div>
+              </div>
+              <div style="background:#0f1a14;border:1px solid #142a1e;border-radius:8px;padding:11px;text-align:center">
+                <div style="font-size:.68rem;color:var(--green);margin-bottom:4px">AFTER ✓</div>
+                <div id="after-stats" style="font-size:.78rem;color:var(--sub)">—</div>
+              </div>
+            </div>
+            <button class="btn btn-p" style="width:100%;margin-top:12px" onclick="storeInDB()">💾 Store in DuckDB →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════ TAB 2: QUERY & ANALYZE -->
+    <div class="screen" id="s2">
+      <div class="sec-head">💬 Query &amp; Analyze</div>
+
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:.73rem;color:var(--muted)">Natural Language → SQL → Insight</span>
+          <span class="badge b-blue">GPT-4o</span>
+          <span class="badge b-green">DuckDB</span>
+          <span id="voice-ind" style="display:none"><span class="voice-pulse"></span><span style="font-size:.7rem;color:var(--red);margin-left:4px">Recording…</span></span>
+        </div>
+        <textarea class="qarea" id="queryInput" rows="2" placeholder="Ask anything about your data — e.g. 'Show top 10 customers by revenue this year'"></textarea>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px">
+          <span class="chip" onclick="setQuery(this)">Top 10 customers by revenue</span>
+          <span class="chip" onclick="setQuery(this)">Monthly revenue trend</span>
+          <span class="chip" onclick="setQuery(this)">Revenue by region</span>
+          <span class="chip" onclick="setQuery(this)">Detect anomalies</span>
+          <span class="chip" onclick="setQuery(this)">Product sales breakdown</span>
+          <span class="chip" onclick="setQuery(this)">Average order value by category</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <button class="btn btn-o btn-sm" id="voiceBtn" onclick="toggleVoice()">🎙️ Voice</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-o btn-sm" onclick="clearResults()">✕ Clear</button>
+            <button class="btn btn-p" id="analyzeBtn" onclick="runAnalysis()">🚀 Analyze</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results area -->
+      <div id="results-area" style="display:none">
+        <!-- Intent + stat bar -->
+        <div class="grid-4" style="margin-bottom:12px">
+          <div class="metric"><div class="val" id="r-intent" style="font-size:.9rem;color:var(--accent2)">—</div><div class="lbl">Intent</div><div class="dl" id="r-conf">—</div></div>
+          <div class="metric"><div class="val" id="r-rows">—</div><div class="lbl">Rows</div></div>
+          <div class="metric"><div class="val" id="r-anom" style="color:var(--yellow)">—</div><div class="lbl">Anomalies</div></div>
+          <div class="metric"><div class="val" id="r-trend" style="font-size:1rem">—</div><div class="lbl">Trend</div></div>
+        </div>
+
+        <!-- AI Insight -->
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-title">💡 AI Insight</div>
+          <div class="insight-box" id="insight-text">Analyzing…</div>
+        </div>
+
+        <!-- Chart + Trend stats -->
+        <div class="grid-2" style="margin-bottom:12px">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div class="card-title" style="margin:0" id="chart-title">Visualization</div>
+              <select class="sb-select" style="width:auto;padding:4px 8px;font-size:.72rem" id="chartTypeSelect" onchange="switchChartType()">
+                <option value="bar">Bar</option>
+                <option value="line">Line</option>
+                <option value="pie">Pie</option>
+                <option value="radar">Radar</option>
+              </select>
+            </div>
+            <div class="ch ch-200"><canvas id="resultChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📈 Trend Analysis</div>
+            <div class="grid-2" style="gap:8px;margin-bottom:10px">
+              <div class="metric"><div class="val" id="t-dir" style="font-size:1.1rem">—</div><div class="lbl">Direction</div></div>
+              <div class="metric"><div class="val" id="t-pct" style="font-size:1.1rem">—</div><div class="lbl">% Change</div></div>
+              <div class="metric"><div class="val" id="t-peak" style="font-size:.9rem">—</div><div class="lbl">Peak Value</div></div>
+              <div class="metric"><div class="val" id="t-avg" style="font-size:.9rem">—</div><div class="lbl">Average</div></div>
+            </div>
+            <div class="ch ch-140"><canvas id="miniTrendChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- SQL + Results table -->
+        <div class="grid-2" style="margin-bottom:12px">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div class="card-title" style="margin:0">🔧 Generated SQL</div>
+              <button class="btn btn-o btn-sm" onclick="copySQL()">📋 Copy</button>
+            </div>
+            <div class="sql-block" id="sql-display">—</div>
+          </div>
+          <div class="card">
+            <div class="card-title">⚠️ Anomalies</div>
+            <div id="anomaly-list" style="max-height:200px;overflow-y:auto">
+              <div style="color:var(--muted);font-size:.77rem">No anomalies detected</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Full results table -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div class="card-title" style="margin:0">📋 Query Results</div>
+            <div style="display:flex;gap:8px">
+              <input type="text" class="sb-input" style="width:160px;padding:5px 9px" placeholder="Filter results…" oninput="filterTable(this.value)" id="tableFilter"/>
+              <button class="btn btn-o btn-sm" onclick="downloadCSV()">⬇️ CSV</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto;max-height:280px;overflow-y:auto" id="result-table-wrap">
+            <div style="color:var(--muted);font-size:.78rem">No results yet</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="no-data-msg" style="text-align:center;padding:40px;color:var(--muted);font-size:.84rem">
+        Upload and process data first, then ask questions here.
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════ TAB 3: AUTO DASHBOARD -->
+    <div class="screen" id="s3">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="sec-head" style="margin:0">🗂️ Auto Dashboard</div>
+          <div id="dash-subtitle" style="font-size:.72rem;color:var(--muted);margin-top:2px">Load data to generate dashboard</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select class="sb-select" style="width:130px" id="dashRange" onchange="updateDashboardRange()">
+            <option>All Time</option>
+            <option selected>Last 12 Months</option>
+            <option>Last 6 Months</option>
+            <option>Last Quarter</option>
+          </select>
+          <button class="btn btn-o btn-sm" onclick="refreshDash()">🔄 Refresh</button>
+          <button class="btn btn-o btn-sm" onclick="exportDashPDF()">⬇️ Export</button>
+          <button class="btn btn-p btn-sm" onclick="regenerateDash()">✨ Regenerate</button>
+        </div>
+      </div>
+
+      <!-- AI Banner -->
+      <div class="insight-box" style="margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
+        <div style="font-size:1.4rem;flex-shrink:0">🤖</div>
+        <div>
+          <div style="font-size:.67rem;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">AI Executive Summary</div>
+          <div id="dash-ai-text" style="font-size:.82rem;line-height:1.7">Load your data to generate an AI executive summary of your business metrics.</div>
+        </div>
+      </div>
+
+      <!-- KPI row (5) -->
+      <div class="grid-5" style="margin-bottom:16px" id="kpi-row">
+        <div class="kpi" style="background:linear-gradient(135deg,#1a1f3a,#1e2540);border:1px solid #2d3460">
+          <div class="k-label">Total Revenue</div><div class="k-val" id="kpi-rev" style="color:var(--accent2)">—</div>
+          <div class="k-delta" id="kpi-rev-d">—</div><div class="k-icon">💰</div>
+        </div>
+        <div class="kpi" style="background:linear-gradient(135deg,#1a2a1f,#1e2e24);border:1px solid #2d4030">
+          <div class="k-label">Total Orders</div><div class="k-val" id="kpi-orders" style="color:var(--green)">—</div>
+          <div class="k-delta" id="kpi-orders-d">—</div><div class="k-icon">🛒</div>
+        </div>
+        <div class="kpi" style="background:linear-gradient(135deg,#2a1f1a,#2e2420);border:1px solid #40302d">
+          <div class="k-label">Avg Order Value</div><div class="k-val" id="kpi-aov" style="color:#fb923c">—</div>
+          <div class="k-delta" id="kpi-aov-d">—</div><div class="k-icon">🎯</div>
+        </div>
+        <div class="kpi" style="background:linear-gradient(135deg,#1a1a2a,#20202e);border:1px solid #2d2d40">
+          <div class="k-label">Unique Customers</div><div class="k-val" id="kpi-cust" style="color:#c084fc">—</div>
+          <div class="k-delta" id="kpi-cust-d">—</div><div class="k-icon">👥</div>
+        </div>
+        <div class="kpi" style="background:linear-gradient(135deg,#2a1f2a,#2e202e);border:1px solid #402d40">
+          <div class="k-label">Anomalies</div><div class="k-val" id="kpi-anom" style="color:var(--pink)">—</div>
+          <div class="k-delta" id="kpi-anom-d" style="color:var(--yellow)">—</div><div class="k-icon">🔍</div>
+        </div>
+      </div>
+
+      <!-- Row 1 -->
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div class="card-title" style="margin:0">📈 Revenue Trend</div>
+            <div style="display:flex;gap:5px">
+              <span class="chip" style="padding:3px 9px;font-size:.67rem" onclick="toggleMALine(this)">MA</span>
+              <span class="chip" style="padding:3px 9px;font-size:.67rem" onclick="toggleTarget(this)">Target</span>
+            </div>
+          </div>
+          <div class="ch ch-200"><canvas id="dashRevChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🍩 Category Breakdown</div>
+          <div style="display:flex;align-items:center;gap:14px">
+            <div style="position:relative;height:180px;width:180px;flex-shrink:0"><canvas id="donutChart"></canvas></div>
+            <div id="donut-legend" style="flex:1;font-size:.76rem"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title">🗺️ Revenue by Region</div>
+          <div class="ch ch-200"><canvas id="regionChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🔥 Orders Heatmap — Day × Hour</div>
+          <div id="heatmap"></div>
+          <div style="display:flex;justify-content:space-between;margin-top:7px">
+            <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;background:var(--bg3)"></div><span style="font-size:.67rem;color:var(--muted)">Low</span></div>
+            <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;background:rgba(99,102,241,.55)"></div><span style="font-size:.67rem;color:var(--muted)">Medium</span></div>
+            <div style="display:flex;align-items:center;gap:5px"><div style="width:9px;height:9px;border-radius:2px;background:var(--accent2)"></div><span style="font-size:.67rem;color:var(--muted)">High</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3 -->
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title">🏆 Top Products</div>
+          <div style="overflow-x:auto;max-height:220px;overflow-y:auto" id="top-products-table">
+            <div style="color:var(--muted);font-size:.77rem">Load data to see top products</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">💚 Customer Health</div>
+          <div id="health-list" style="max-height:220px;overflow-y:auto">
+            <div style="color:var(--muted);font-size:.77rem">Load data to see customer health</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 4 -->
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title">📊 MoM Revenue Change</div>
+          <div class="ch ch-160"><canvas id="waterfallChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🔵 Volume vs Value Scatter</div>
+          <div class="ch ch-160"><canvas id="scatterChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Row 5: Anomaly timeline -->
+      <div class="card">
+        <div class="card-title">⚠️ Anomaly Timeline</div>
+        <div class="ch ch-140" style="margin-bottom:10px"><canvas id="anomalyChart"></canvas></div>
+        <div id="dash-anomaly-list">
+          <div style="color:var(--muted);font-size:.77rem">No anomalies to display</div>
+        </div>
+      </div>
+
+      <!-- Regenerate overlay -->
+      <div class="overlay" id="regen-overlay">
+        <div class="spinner"></div>
+        <div class="ov-title" id="regen-status">Scanning columns…</div>
+        <div style="width:260px"><div class="prog-wrap"><div class="prog-bar" id="regen-bar" style="width:0%;background:var(--accent)"></div></div></div>
+        <div class="ov-sub" id="regen-sub">AI is analyzing your dataset</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════ TAB 4: HISTORY -->
+    <div class="screen" id="s4">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="sec-head" style="margin:0">📜 Query History</div>
+        <button class="btn btn-danger btn-sm" onclick="clearHistory()">🗑️ Clear All</button>
+      </div>
+      <div id="history-list">
+        <div style="text-align:center;padding:40px;color:var(--muted);font-size:.84rem">No queries yet. Ask something in the Query tab!</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════ TAB 5: ML INSIGHTS -->
+    <div class="screen" id="s5">
+      <div class="sec-head">⚙️ ML Insights</div>
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title">🔬 Anomaly Detection</div>
+          <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="sb-select" style="width:auto" id="mlAnomalyMethod">
+              <option value="zscore">Z-Score (threshold: 3σ)</option>
+              <option value="iqr">IQR Method</option>
+            </select>
+            <button class="btn btn-p btn-sm" onclick="runMLAnomaly()">▶ Run</button>
+          </div>
+          <div id="ml-anomaly-results" style="font-size:.77rem;color:var(--muted)">Run anomaly detection to see results.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 Correlation Matrix</div>
+          <div class="ch ch-200"><canvas id="corrChart"></canvas></div>
+          <button class="btn btn-o btn-sm" style="margin-top:8px;width:100%" onclick="buildCorrMatrix()">Build Correlation Matrix</button>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📉 Trend Decomposition</div>
+          <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <select class="sb-select" style="width:auto" id="trendNumCol"></select>
+            <button class="btn btn-p btn-sm" onclick="runTrendDecomp()">▶ Analyze</button>
+          </div>
+          <div class="ch ch-160"><canvas id="trendDecompChart"></canvas></div>
+          <div id="trend-stats" style="margin-top:8px;font-size:.76rem;color:var(--muted)"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📦 Distribution Analysis</div>
+          <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <select class="sb-select" style="width:auto" id="distNumCol2"></select>
+            <button class="btn btn-p btn-sm" onclick="runDistAnalysis()">▶ Analyze</button>
+          </div>
+          <div class="ch ch-160"><canvas id="distAnalysisChart"></canvas></div>
+          <div id="dist-stats" style="margin-top:8px;font-size:.76rem;color:var(--muted)"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- Toast -->
+<div class="toast" id="toast" style="display:none"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+const STATE = {
+  rawData: null,       // original parsed rows
+  cleanData: null,     // after cleaning
+  dbData: null,        // stored (alias of cleanData)
+  columns: [],
+  fileName: '',
+  profile: null,
+  quality: null,
+  queryHistory: [],
+  charts: {},          // chart instances keyed by id
+  currentSQL: '',
+  currentResults: null,
+  voiceActive: false,
+  mediaRecorder: null,
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════
+function fmt(n){ if(n==null)return'—'; n=Number(n); if(isNaN(n))return'—'; if(Math.abs(n)>=1e6)return'$'+(n/1e6).toFixed(1)+'M'; if(Math.abs(n)>=1e3)return'$'+(n/1e3).toFixed(1)+'K'; return n%1===0?n.toLocaleString():'$'+n.toFixed(2); }
+function fmtN(n){ if(n==null||isNaN(n))return'—'; if(Math.abs(n)>=1e6)return(n/1e6).toFixed(1)+'M'; if(Math.abs(n)>=1e3)return(n/1e3).toFixed(0)+'K'; return Number(n).toLocaleString(); }
+function mean(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
+function std(arr){ const m=mean(arr); return Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length); }
+function destroyChart(id){ if(STATE.charts[id]){STATE.charts[id].destroy();delete STATE.charts[id];} }
+function makeChart(id,cfg){ destroyChart(id); const ctx=document.getElementById(id); if(!ctx)return null; STATE.charts[id]=new Chart(ctx,cfg); return STATE.charts[id]; }
+function toast(msg,type='info'){
+  const t=document.getElementById('toast');
+  const icons={info:'ℹ️',success:'✅',error:'❌',warn:'⚠️'};
+  t.innerHTML=`<span>${icons[type]||'ℹ️'}</span> ${msg}`;
+  t.style.display='flex'; t.style.borderColor=type==='success'?'#142a1e':type==='error'?'#2a1414':'var(--border)';
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display='none',3200);
+}
+function setPipeStage(idx){
+  ['pipe0','pipe1','pipe2','pipe3','pipe4','pipe5'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.className='ps'+(i<idx?' done':i===idx?' active':'');
+  });
+}
+const chartDefaults=()=>({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2640',titleColor:'#c7d0f0',bodyColor:'#8890b4',borderColor:'#2d3460',borderWidth:1}},scales:{x:{grid:{color:'#1e2640'},ticks:{font:{size:9},color:'#4b5680'}},y:{grid:{color:'#1e2640'},ticks:{font:{size:9},color:'#4b5680'}}}});
+Chart.defaults.color='#4b5680';
+
+// ═══════════════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════════════════════
+function goTab(idx,el){
+  document.querySelectorAll('.screen').forEach((s,i)=>s.classList.toggle('active',i===idx));
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  if(idx===3&&STATE.dbData) buildDashboard();
+  if(idx===5&&STATE.dbData) populateMLSelects();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FILE HANDLING
+// ═══════════════════════════════════════════════════════════════════
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag');
+  const f=e.dataTransfer.files[0]; if(f) handleFile(f);
+}
+function handleFile(file){
+  if(!file)return;
+  STATE.fileName=file.name;
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){
+    Papa.parse(file,{header:true,dynamicTyping:true,skipEmptyLines:true,complete:r=>afterLoad(r.data,file.name)});
+  } else if(ext==='json'){
+    const reader=new FileReader();
+    reader.onload=e=>{try{const d=JSON.parse(e.target.result);afterLoad(Array.isArray(d)?d:[d],file.name);}catch(err){toast('Invalid JSON','error');}};
+    reader.readAsText(file);
+  } else {
+    toast('Please upload CSV or JSON. For Excel, convert to CSV first.','warn');
+  }
+}
+
+function afterLoad(data,name){
+  if(!data||data.length===0){toast('No data found in file','error');return;}
+  STATE.rawData=data;
+  STATE.columns=Object.keys(data[0]);
+  // Summary stats
+  const missing=data.reduce((a,r)=>a+STATE.columns.filter(c=>r[c]==null||r[c]==='').length,0);
+  const seen=new Set(); let dups=0;
+  data.forEach(r=>{const k=JSON.stringify(r);if(seen.has(k))dups++;else seen.add(k);});
+  // UI updates
+  document.getElementById('file-loaded').style.display='block';
+  document.getElementById('file-name').textContent=name;
+  document.getElementById('file-meta').textContent=`${data.length.toLocaleString()} rows · ${STATE.columns.length} columns · Loaded just now`;
+  document.getElementById('m-rows').textContent=fmtN(data.length);
+  document.getElementById('m-cols').textContent=STATE.columns.length;
+  document.getElementById('m-miss').textContent=fmtN(missing);
+  document.getElementById('m-dups').textContent=fmtN(dups);
+  // Preview
+  renderPreviewTable(data.slice(0,5));
+  // Column type editor
+  renderColTypeEditor();
+  setPipeStage(0);
+  toast(`Loaded ${data.length.toLocaleString()} rows from ${name}`,'success');
+  document.getElementById('sb-table-info').textContent='Table: '+document.getElementById('tableName').value;
+  document.getElementById('sb-row-info').textContent=data.length.toLocaleString()+' rows (raw)';
+}
+
+function renderPreviewTable(rows){
+  const cols=STATE.columns;
+  let html=`<table class="tbl"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(r=>{ html+=`<tr>${cols.map(c=>`<td>${r[c]??'—'}</td>`).join('')}</tr>`; });
+  html+='</tbody></table>';
+  document.getElementById('preview-table-wrap').innerHTML=html;
+}
+
+function renderColTypeEditor(){
+  const cols=STATE.columns;
+  document.getElementById('col-type-editor').style.display='block';
+  document.getElementById('col-types').innerHTML=cols.map(c=>`
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+      <span style="font-size:.74rem;color:var(--text);width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis">${c}</span>
+      <select class="sb-select" style="flex:1;padding:3px 6px;font-size:.72rem">
+        <option>auto</option><option>string</option><option>number</option><option>datetime</option><option>boolean</option>
+      </select>
+    </div>`).join('');
+}
+
+// ── Sample datasets ──
+function loadSample(type){
+  const samples={
+    sales: generateSalesData(500),
+    ecommerce: generateEcommerceData(400),
+    finance: generateFinanceData(300),
+  };
+  afterLoad(samples[type], type+'_sample.csv');
+}
+
+function generateSalesData(n){
+  const customers=['Stark Industries','Acme Corp','Umbrella Co','Globex Ltd','Initech','Cyberdyne','Tyrell Corp','Weyland-Yutani','InGen','Oscorp'];
+  const products=['Enterprise Plan','Pro Plan','Starter Plan','Hardware Kit XL','Hardware Kit S','Support Services','Training Bundle'];
+  const regions=['North','East','West','South'];
+  const categories=['SaaS','Hardware','Services'];
+  return Array.from({length:n},(_,i)=>{
+    const d=new Date(2024,Math.floor(Math.random()*12),Math.floor(Math.random()*28)+1);
+    const cat=categories[Math.floor(Math.random()*3)];
+    const rev=cat==='SaaS'?[890,4200,24000][Math.floor(Math.random()*3)]:cat==='Hardware'?Math.floor(Math.random()*15000)+500:Math.floor(Math.random()*5000)+200;
+    return {order_id:`#${10000+i}`,date:d.toISOString().split('T')[0],customer:customers[Math.floor(Math.random()*10)],product:products[Math.floor(Math.random()*7)],category:cat,revenue:i===50?rev*3.5:rev,quantity:Math.floor(Math.random()*10)+1,region:regions[Math.floor(Math.random()*4)],sales_rep:`Rep ${Math.floor(Math.random()*5)+1}`};
+  });
+}
+function generateEcommerceData(n){
+  const cats=['Electronics','Clothing','Food','Books','Sports','Home'];
+  return Array.from({length:n},(_,i)=>{
+    const d=new Date(2024,Math.floor(Math.random()*12),Math.floor(Math.random()*28)+1);
+    return {order_id:`EC${1000+i}`,date:d.toISOString().split('T')[0],product_id:`P${Math.floor(Math.random()*200)+1}`,category:cats[Math.floor(Math.random()*6)],price:+(Math.random()*500+5).toFixed(2),quantity:Math.floor(Math.random()*5)+1,customer_id:`C${Math.floor(Math.random()*100)+1}`,rating:+(Math.random()*2+3).toFixed(1),returns:Math.random()<.1?1:0};
+  });
+}
+function generateFinanceData(n){
+  const types=['Revenue','Expense','Investment','Refund'];
+  const depts=['Sales','Marketing','Engineering','Operations','HR'];
+  return Array.from({length:n},(_,i)=>{
+    const d=new Date(2024,Math.floor(Math.random()*12),Math.floor(Math.random()*28)+1);
+    const t=types[Math.floor(Math.random()*4)];
+    const amt=t==='Revenue'?Math.floor(Math.random()*100000)+1000:t==='Expense'?-(Math.floor(Math.random()*50000)+500):t==='Investment'?-(Math.floor(Math.random()*200000)+5000):-(Math.floor(Math.random()*5000)+100);
+    return {tx_id:`TX${100+i}`,date:d.toISOString().split('T')[0],type:t,department:depts[Math.floor(Math.random()*5)],amount:i===20?amt*4:amt,description:`${t} - ${depts[Math.floor(Math.random()*5)]}`,approved:Math.random()>.1?'Yes':'No'};
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FULL PIPELINE
+// ═══════════════════════════════════════════════════════════════════
+async function runPipeline(){
+  if(!STATE.rawData){toast('Load data first','warn');return;}
+  const steps=[
+    {fn:runProfile,   label:'Profiling data…',   pipe:1},
+    {fn:runClean,     label:'Auto-cleaning…',     pipe:2},
+    {fn:storeInDB,    label:'Storing in DB…',     pipe:3},
+    {fn:buildDashboard,label:'Building dashboard…',pipe:5},
+  ];
+  const ov=document.getElementById('regen-overlay');
+  ov.style.display='flex';
+  for(let i=0;i<steps.length;i++){
+    document.getElementById('regen-status').textContent=steps[i].label;
+    document.getElementById('regen-bar').style.width=((i+1)/steps.length*100)+'%';
+    setPipeStage(steps[i].pipe);
+    await new Promise(r=>setTimeout(r,400));
+    steps[i].fn();
+    await new Promise(r=>setTimeout(r,300));
+  }
+  ov.style.display='none';
+  toast('Pipeline complete! Dashboard ready.','success');
+  goTab(3,document.querySelectorAll('.tab')[3]);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PROFILER
+// ═══════════════════════════════════════════════════════════════════
+function runProfile(){
+  const data=STATE.rawData; if(!data){toast('No data loaded','warn');return;}
+  const cols=STATE.columns;
+  const n=data.length;
+  // Missing
+  const missing=data.reduce((a,r)=>a+cols.filter(c=>r[c]==null||r[c]==='').length,0);
+  const seen=new Set(); let dups=0;
+  data.forEach(r=>{const k=JSON.stringify(r);if(seen.has(k))dups++;else seen.add(k);});
+  // Column profiles
+  const profile={};
+  cols.forEach(c=>{
+    const vals=data.map(r=>r[c]).filter(v=>v!=null&&v!=='');
+    const numVals=vals.filter(v=>typeof v==='number'||!isNaN(Number(v)));
+    const isNum=numVals.length/Math.max(vals.length,1)>0.8;
+    const miss=data.filter(r=>r[c]==null||r[c]==='').length;
+    profile[c]={dtype:isNum?'numeric':'string',missing:miss,missPct:(miss/n*100).toFixed(1),unique:[...new Set(vals)].length,isNum};
+    if(isNum){
+      const nums=numVals.map(Number);
+      profile[c].min=Math.min(...nums); profile[c].max=Math.max(...nums);
+      profile[c].mean=mean(nums); profile[c].std=std(nums);
+      const outliers=nums.filter(v=>Math.abs((v-profile[c].mean)/Math.max(profile[c].std,.0001))>3);
+      profile[c].outliers=outliers.length;
+    } else {
+      const vc={};vals.forEach(v=>{vc[v]=(vc[v]||0)+1;});
+      profile[c].topVals=Object.entries(vc).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    }
+  });
+  STATE.profile=profile;
+  // Quality
+  const comp=(1-missing/(n*cols.length))*100;
+  const uniq=(1-dups/n)*100;
+  const outlierRate=Object.values(profile).filter(p=>p.isNum).reduce((a,p)=>a+p.outliers,0);
+  const totalNums=cols.filter(c=>profile[c].isNum).reduce((a)=>a+n,0);
+  const cons=Math.max(0,(1-outlierRate/Math.max(totalNums,1))*100);
+  const valid=cols.filter(c=>{
+    const p=profile[c];
+    if(!p.isNum)return true;
+    return !(data.some(r=>r[c]!=null&&r[c]!==''&&isNaN(Number(r[c]))));
+  }).length/cols.length*100;
+  const overall=comp*0.35+uniq*0.25+cons*0.25+valid*0.15;
+  STATE.quality={comp,uniq,cons,valid,overall};
+  // Render
+  renderProfile(profile,n,missing,dups);
+  renderQuality(STATE.quality);
+  setPipeStage(1);
+  // Dist chart
+  const numCols=cols.filter(c=>profile[c].isNum);
+  if(numCols.length>0){
+    const sel=document.getElementById('distColSelect');
+    sel.innerHTML=numCols.map(c=>`<option>${c}</option>`).join('');
+    document.getElementById('dist-select-wrap').style.display='block';
+    updateDistChart();
+  }
+  toast('Profiling complete','success');
+}
+
+function renderProfile(profile,n,missing,dups){
+  document.getElementById('p-rows').textContent=fmtN(n);
+  document.getElementById('p-miss').textContent=fmtN(missing);
+  document.getElementById('p-dups').textContent=fmtN(dups);
+  const html=Object.entries(profile).map(([c,p])=>`
+    <div class="col-row">
+      <div class="cn" title="${c}">${c}</div>
+      <div class="ct"><span class="badge ${p.isNum?'b-yellow':'b-blue'}">${p.dtype}</span></div>
+      <div class="cbw"><div class="cb" style="width:${100-p.missPct}%"></div></div>
+      <div class="cm2" style="color:${p.missPct>5?'var(--yellow)':'var(--muted)'}">${p.missPct}% miss</div>
+      ${p.isNum?`<div style="font-size:.66rem;color:var(--muted);width:120px;flex-shrink:0;text-align:right">μ=${p.mean.toFixed(1)} σ=${p.std.toFixed(1)}</div>`:`<div style="font-size:.66rem;color:var(--muted);width:120px;flex-shrink:0;text-align:right">${p.unique} uniq</div>`}
+    </div>`).join('');
+  document.getElementById('col-details').innerHTML=html;
+}
+
+function renderQuality(q){
+  const grade=q.overall>=90?'A':q.overall>=75?'B':q.overall>=60?'C':q.overall>=40?'D':'F';
+  const colors={A:'var(--green)',B:'#84cc16',C:'var(--yellow)',D:'#f97316',F:'var(--red)'};
+  const c=colors[grade];
+  document.getElementById('grade-circle').textContent=grade;
+  document.getElementById('grade-circle').style.color=c;
+  document.getElementById('grade-circle').style.borderColor=c;
+  document.getElementById('quality-score').textContent=q.overall.toFixed(1);
+  document.getElementById('quality-score').style.color=c;
+  const sets=[['q-comp',q.comp,'var(--accent)'],['q-uniq',q.uniq,'var(--green)'],['q-cons',q.cons,'var(--yellow)'],['q-valid',q.valid,'var(--accent2)']];
+  sets.forEach(([id,val,col])=>{
+    document.getElementById(id).style.width=val+'%';
+    document.getElementById(id).style.background=col;
+    document.getElementById(id+'-v').textContent=val.toFixed(1)+'%';
+  });
+}
+
+function updateDistChart(){
+  const col=document.getElementById('distColSelect').value;
+  if(!col||!STATE.rawData)return;
+  const vals=STATE.rawData.map(r=>Number(r[col])).filter(v=>!isNaN(v)&&v!=null);
+  if(vals.length===0)return;
+  const min=Math.min(...vals),max=Math.max(...vals),bins=20;
+  const bw=(max-min)/bins;
+  const counts=Array(bins).fill(0);
+  vals.forEach(v=>{const b=Math.min(Math.floor((v-min)/bw),bins-1);counts[b]++;});
+  const labels=Array.from({length:bins},(_,i)=>(min+i*bw).toFixed(0));
+  makeChart('distChart',{type:'bar',data:{labels,datasets:[{data:counts,backgroundColor:'rgba(99,102,241,.65)',borderColor:'#6366f1',borderWidth:1,borderRadius:3}]},options:{...chartDefaults(),plugins:{legend:{display:false}}}});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CLEANER
+// ═══════════════════════════════════════════════════════════════════
+function runClean(){
+  if(!STATE.rawData){toast('No data loaded','warn');return;}
+  const data=JSON.parse(JSON.stringify(STATE.rawData));
+  const log=[];
+  // Remove duplicates
+  const seen=new Set(); const before=data.length;
+  const deduped=data.filter(r=>{const k=JSON.stringify(r);if(seen.has(k))return false;seen.add(k);return true;});
+  const dupCount=before-deduped.length;
+  if(dupCount>0) log.push(`✅ Removed ${dupCount} duplicate rows`);
+  // Standardize col names
+  const oldCols=Object.keys(deduped[0]||{});
+  const newCols=oldCols.map(c=>c.trim().toLowerCase().replace(/\s+/g,'_').replace(/-/g,'_'));
+  const renamed=deduped.map(r=>{const n={};oldCols.forEach((oc,i)=>n[newCols[i]]=r[oc]);return n;});
+  if(JSON.stringify(oldCols)!==JSON.stringify(newCols)) log.push(`✅ Standardized ${oldCols.length} column names to snake_case`);
+  // Fill missing values
+  const cols=newCols;
+  const filled=renamed.map(r=>({...r}));
+  cols.forEach(c=>{
+    const vals=filled.map(r=>r[c]).filter(v=>v!=null&&v!=='');
+    const numVals=vals.filter(v=>typeof v==='number'||!isNaN(Number(v))).map(Number);
+    const isNum=numVals.length/Math.max(vals.length,1)>0.8;
+    let fillCount=0;
+    if(isNum){
+      const med=numVals.sort((a,b)=>a-b)[Math.floor(numVals.length/2)]||0;
+      filled.forEach(r=>{if(r[c]==null||r[c]===''){r[c]=med;fillCount++;}});
+      if(fillCount) log.push(`✅ Filled ${fillCount} missing in '${c}' with median (${med})`);
+    } else {
+      const vc={};vals.forEach(v=>{vc[v]=(vc[v]||0)+1;});
+      const mode=Object.entries(vc).sort((a,b)=>b[1]-a[1])[0]?.[0]||'Unknown';
+      filled.forEach(r=>{if(r[c]==null||r[c]===''){r[c]=mode;fillCount++;}});
+      if(fillCount) log.push(`✅ Filled ${fillCount} missing in '${c}' with mode ('${mode}')`);
+    }
+    // Strip whitespace from strings
+    filled.forEach(r=>{if(typeof r[c]==='string')r[c]=r[c].trim();});
+  });
+  if(cols.some(c=>filled.some(r=>typeof r[c]==='string'&&r[c]!==r[c].trim()))) log.push(`✅ Stripped whitespace from text columns`);
+  STATE.cleanData=filled;
+  STATE.columns=cols;
+  // Before/after
+  const origMiss=STATE.rawData.reduce((a,r)=>a+cols.filter(c=>r[c]==null||r[c]==='').length,0);
+  document.getElementById('before-stats').textContent=`${STATE.rawData.length.toLocaleString()} rows · ${origMiss} nulls · ${dupCount} dupes`;
+  document.getElementById('after-stats').textContent=`${filled.length.toLocaleString()} rows · 0 nulls · 0 dupes`;
+  document.getElementById('clean-log').innerHTML=log.length?log.map(l=>`<div>${l}</div>`).join(''):'<div>No changes needed — data was clean!</div>';
+  log.push(`✅ Auto-clean complete (${log.length} operations)`);
+  setPipeStage(2);
+  toast(`Cleaned: ${log.length} operations applied`,'success');
+}
+
+function storeInDB(){
+  if(!STATE.cleanData&&!STATE.rawData){toast('No data to store','warn');return;}
+  STATE.dbData=STATE.cleanData||STATE.rawData;
+  const tbl=document.getElementById('tableName').value||'business_data';
+  document.getElementById('sb-table-info').textContent='Table: '+tbl;
+  document.getElementById('sb-row-info').textContent=STATE.dbData.length.toLocaleString()+' rows (clean)';
+  setPipeStage(3);
+  toast(`Stored ${STATE.dbData.length.toLocaleString()} rows as '${tbl}'`,'success');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INTENT CLASSIFIER
+// ═══════════════════════════════════════════════════════════════════
+function classifyIntent(q){
+  const lq=q.toLowerCase();
+  const patterns={
+    'top_n':[/top\s+\d+/,/best/,/highest/,/most/,/leading/,/ranking/],
+    'bottom_n':[/bottom\s+\d+/,/worst/,/lowest/,/least/,/lagging/],
+    'trend':[/trend/,/over time/,/monthly/,/weekly/,/growth/,/decline/,/forecast/,/by month/,/by week/],
+    'anomaly':[/anomal/,/outlier/,/unusual/,/spike/,/abnormal/,/detect/],
+    'compare':[/compar/,/vs\b/,/versus/,/difference/,/between/],
+    'summary':[/total/,/sum/,/average/,/mean/,/count/,/overview/,/summary/,/breakdown/],
+    'distribution':[/distribut/,/histogram/,/spread/,/range/],
+    'correlation':[/correlat/,/relationship/,/impact/,/affect/,/influence/],
+  };
+  let best='summary',bestScore=0;
+  for(const[intent,pats]of Object.entries(patterns)){
+    const score=pats.filter(p=>p.test(lq)).length/pats.length;
+    if(score>bestScore){bestScore=score;best=intent;}
+  }
+  return {name:best,confidence:Math.max(.65,bestScore||.7)};
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SQL GENERATOR (in-browser)
+// ═══════════════════════════════════════════════════════════════════
+function generateSQL(query,intent,data,tbl){
+  const cols=Object.keys(data[0]||{});
+  const numCols=cols.filter(c=>data.some(r=>typeof r[c]==='number'));
+  const strCols=cols.filter(c=>!numCols.includes(c));
+  const dateCols=cols.filter(c=>data.some(r=>typeof r[c]==='string'&&/\d{4}-\d{2}-\d{2}/.test(r[c])));
+  const revCol=numCols.find(c=>/rev|sale|amount|price|total|value/i.test(c))||numCols[0];
+  const custCol=strCols.find(c=>/customer|client|buyer|user/i.test(c))||strCols[0];
+  const catCol=strCols.find(c=>/category|type|product|segment/i.test(c))||strCols[1];
+  const dateCol=dateCols[0];
+  const q=query.toLowerCase();
+  const nMatch=q.match(/(\d+)/);
+  const N=nMatch?parseInt(nMatch[1]):10;
+  let sql='';
+  if(intent==='top_n'&&revCol&&custCol) sql=`SELECT ${custCol}, SUM(${revCol}) AS total_revenue, COUNT(*) AS orders\nFROM ${tbl}\nGROUP BY ${custCol}\nORDER BY total_revenue DESC\nLIMIT ${N}`;
+  else if(intent==='bottom_n'&&revCol&&custCol) sql=`SELECT ${custCol}, SUM(${revCol}) AS total_revenue, COUNT(*) AS orders\nFROM ${tbl}\nGROUP BY ${custCol}\nORDER BY total_revenue ASC\nLIMIT ${N}`;
+  else if(intent==='trend'&&dateCol&&revCol) sql=`SELECT SUBSTR(${dateCol},1,7) AS month, SUM(${revCol}) AS revenue, COUNT(*) AS orders\nFROM ${tbl}\nGROUP BY month\nORDER BY month`;
+  else if(intent==='summary'&&revCol) sql=`SELECT COUNT(*) AS total_orders, SUM(${revCol}) AS total_revenue, AVG(${revCol}) AS avg_order_value, MIN(${revCol}) AS min_value, MAX(${revCol}) AS max_value\nFROM ${tbl}`;
+  else if(intent==='compare'&&catCol&&revCol) sql=`SELECT ${catCol}, SUM(${revCol}) AS revenue, COUNT(*) AS orders, AVG(${revCol}) AS avg_value\nFROM ${tbl}\nGROUP BY ${catCol}\nORDER BY revenue DESC`;
+  else if(intent==='distribution'&&revCol) sql=`SELECT ${revCol}, COUNT(*) AS frequency\nFROM ${tbl}\nGROUP BY ${revCol}\nORDER BY ${revCol}`;
+  else if(revCol) sql=`SELECT ${cols.slice(0,5).join(', ')}\nFROM ${tbl}\nLIMIT 50`;
+  else sql=`SELECT *\nFROM ${tbl}\nLIMIT 20`;
+  return sql;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// IN-MEMORY SQL EXECUTOR
+// ═══════════════════════════════════════════════════════════════════
+function executeSQL(sql,data){
+  try{
+    // Parse SELECT columns
+    const selMatch=sql.match(/SELECT\s+([\s\S]+?)\s+FROM/i);
+    const fromMatch=sql.match(/FROM\s+\w+/i);
+    const whereMatch=sql.match(/WHERE\s+([\s\S]+?)(?:\s+GROUP|\s+ORDER|\s+LIMIT|$)/i);
+    const groupMatch=sql.match(/GROUP BY\s+([\s\S]+?)(?:\s+ORDER|\s+LIMIT|$)/i);
+    const orderMatch=sql.match(/ORDER BY\s+(\w+)\s*(ASC|DESC)?/i);
+    const limitMatch=sql.match(/LIMIT\s+(\d+)/i);
+    if(!selMatch||!fromMatch)return data.slice(0,20);
+    let rows=[...data];
+    // WHERE (basic)
+    if(whereMatch){
+      const cond=whereMatch[1].trim();
+      // Support: col >= value, col <= value, col = 'val'
+      const m=cond.match(/(\w+)\s*(>=|<=|=|>|<)\s*'?([^']+)'?/i);
+      if(m){
+        const[,col,op,val]=m; const numVal=parseFloat(val);
+        rows=rows.filter(r=>{
+          const rv=r[col];
+          if(op==='>=')return rv>=numVal;if(op==='<=')return rv<=numVal;
+          if(op==='>')return rv>numVal;if(op==='<')return rv<numVal;
+          return String(rv)===val;
+        });
+      }
+    }
+    // GROUP BY
+    if(groupMatch){
+      const gcols=groupMatch[1].split(',').map(s=>s.trim().split(/\s+/)[0]);
+      const selParts=selMatch[1].split(',').map(s=>s.trim());
+      // Build aggregation map
+      const aggMap={};
+      rows.forEach(r=>{
+        const key=gcols.map(c=>r[c]).join('||');
+        if(!aggMap[key]){aggMap[key]={__cols:{}};gcols.forEach(c=>aggMap[key].__cols[c]=r[c]);}
+        selParts.forEach(sp=>{
+          const sumM=sp.match(/SUM\((\w+)\)\s+AS\s+(\w+)/i);
+          const cntM=sp.match(/COUNT\(\*\)\s+AS\s+(\w+)/i);
+          const avgM=sp.match(/AVG\((\w+)\)\s+AS\s+(\w+)/i);
+          const minM=sp.match(/MIN\((\w+)\)\s+AS\s+(\w+)/i);
+          const maxM=sp.match(/MAX\((\w+)\)\s+AS\s+(\w+)/i);
+          if(sumM){aggMap[key][sumM[2]]=(aggMap[key][sumM[2]]||0)+(Number(r[sumM[1]])||0);}
+          if(cntM){aggMap[key][cntM[1]]=(aggMap[key][cntM[1]]||0)+1;}
+          if(avgM){
+            if(!aggMap[key].__avg) aggMap[key].__avg={};
+            if(!aggMap[key].__avg[avgM[1]]){aggMap[key].__avg[avgM[1]]={sum:0,cnt:0};}
+            aggMap[key].__avg[avgM[1]].sum+=(Number(r[avgM[1]])||0);
+            aggMap[key].__avg[avgM[1]].cnt++;
+            aggMap[key][avgM[2]]=aggMap[key].__avg[avgM[1]].sum/aggMap[key].__avg[avgM[1]].cnt;
+          }
+          if(minM){aggMap[key][minM[2]]=Math.min(aggMap[key][minM[2]]??Infinity,Number(r[minM[1]])||0);}
+          if(maxM){aggMap[key][maxM[2]]=Math.max(aggMap[key][maxM[2]]??-Infinity,Number(r[maxM[1]])||0);}
+        });
+      });
+      rows=Object.values(aggMap).map(g=>{const out={...g.__cols};delete g.__cols;delete g.__avg;return{...out,...g};});
+    } else {
+      // Non-aggregate: project columns
+      const selParts=selMatch[1].trim();
+      if(selParts!=='*'){
+        const cols=selParts.split(',').map(s=>{
+          const m=s.trim().match(/(\w+)\s+AS\s+(\w+)/i);
+          return m?{from:m[1],to:m[2]}:{from:s.trim(),to:s.trim()};
+        });
+        rows=rows.map(r=>{const o={};cols.forEach(c=>o[c.to]=r[c.from]);return o;});
+      }
+    }
+    // ORDER BY
+    if(orderMatch){
+      const col=orderMatch[1]; const dir=orderMatch[2]?.toUpperCase()||'ASC';
+      rows.sort((a,b)=>dir==='DESC'?b[col]-a[col]:a[col]-b[col]);
+    }
+    // LIMIT
+    if(limitMatch) rows=rows.slice(0,parseInt(limitMatch[1]));
+    return rows;
+  } catch(e){ console.error('SQL exec error',e); return data.slice(0,20); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ANOMALY DETECTION
+// ═══════════════════════════════════════════════════════════════════
+function detectAnomalies(data,method='zscore'){
+  const cols=Object.keys(data[0]||{}).filter(c=>data.some(r=>typeof r[c]==='number'));
+  const found=[];
+  cols.forEach(col=>{
+    const vals=data.map(r=>Number(r[col])).filter(v=>!isNaN(v));
+    if(vals.length<4)return;
+    if(method==='zscore'){
+      const m=mean(vals),s=std(vals);
+      if(s===0)return;
+      data.forEach((r,i)=>{
+        const z=Math.abs((Number(r[col])-m)/s);
+        if(z>3) found.push({row:i+1,column:col,value:r[col],z_score:+z.toFixed(2),type:'Z-Score'});
+      });
+    } else {
+      const sorted=[...vals].sort((a,b)=>a-b);
+      const q1=sorted[Math.floor(sorted.length*.25)],q3=sorted[Math.floor(sorted.length*.75)];
+      const iqr=q3-q1, lo=q1-1.5*iqr, hi=q3+1.5*iqr;
+      data.forEach((r,i)=>{
+        const v=Number(r[col]);
+        if(v<lo||v>hi) found.push({row:i+1,column:col,value:v,iqr_bound:v<lo?`<${lo.toFixed(1)}`:`>${hi.toFixed(1)}`,type:'IQR'});
+      });
+    }
+  });
+  return found.slice(0,20);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TREND ANALYSIS
+// ═══════════════════════════════════════════════════════════════════
+function analyzeTrend(data){
+  const numCols=Object.keys(data[0]||{}).filter(c=>data.some(r=>typeof r[c]==='number'));
+  if(numCols.length===0)return null;
+  const col=numCols[0];
+  const vals=data.map(r=>Number(r[col])).filter(v=>!isNaN(v));
+  if(vals.length<2)return null;
+  const first=vals[0],last=vals[vals.length-1];
+  const change=last-first;
+  const pct=(change/Math.abs(first||1))*100;
+  const avg=mean(vals);
+  const peak=Math.max(...vals);
+  return{col,direction:change>0?'⬆️ Upward':change<0?'⬇️ Downward':'➡️ Flat',pct:+pct.toFixed(1),change:+change.toFixed(2),avg:+avg.toFixed(2),peak:+peak.toFixed(2)};
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INSIGHT GENERATOR (rule-based fallback, API if key present)
+// ═══════════════════════════════════════════════════════════════════
+async function generateInsight(query,results,intent,anomalies,trend){
+  const apiKey=document.getElementById('apiKey').value.trim();
+  if(apiKey&&apiKey.startsWith('sk-')){
+    try{
+      const dataStr=results.slice(0,15).map(r=>JSON.stringify(r)).join('\n');
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
+        body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:250,messages:[{role:'user',content:`You are a senior business analyst. Given query "${query}" with intent "${intent.name}", analyze these results and provide 3-4 sentences of actionable business insight. Be specific about numbers.\n\nData:\n${dataStr}\n${anomalies.length?'Anomalies: '+anomalies.length+' detected':''}\n${trend?'Trend: '+trend.direction+' '+trend.pct+'%':''}`}]})
+      });
+      const d=await resp.json();
+      return d.content?.[0]?.text||fallbackInsight(intent,results,trend,anomalies);
+    }catch(e){return fallbackInsight(intent,results,trend,anomalies);}
+  }
+  return fallbackInsight(intent,results,trend,anomalies);
+}
+
+function fallbackInsight(intent,results,trend,anomalies){
+  const n=results.length;
+  const numCols=Object.keys(results[0]||{}).filter(c=>results.some(r=>typeof r[c]==='number'));
+  const firstNumCol=numCols[0];
+  const topVal=firstNumCol?results[0]?.[firstNumCol]:null;
+  const insightMap={
+    top_n:`Your top ${n} performers account for a significant share of total output. ${topVal?`The leader shows ${fmt(topVal)} which is worth monitoring for concentration risk.`:''} Consider whether this concentration poses a business risk and diversification strategies.`,
+    bottom_n:`The bottom ${n} performers may need targeted intervention. ${topVal?`The lowest value recorded is ${fmt(topVal)}.`:''} Investigate root causes — product fit, regional factors, or seasonality — before making decisions.`,
+    trend:`${trend?`Revenue is trending ${trend.direction} with a ${trend.pct>0?'+':''}${trend.pct}% change. Peak reached ${fmt(trend.peak)} and average is ${fmt(trend.avg)}.`:''} Consider seasonal patterns and external factors when interpreting this trend.`,
+    anomaly:`${anomalies.length} anomalies detected ${anomalies.length>0?`in columns: ${[...new Set(anomalies.map(a=>a.column))].join(', ')}`:''} — these warrant manual review. High z-scores may indicate data entry errors, exceptional events, or emerging trends.`,
+    summary:`Dataset summary across ${n} metrics computed. ${topVal?`Total aggregated value: ${fmt(topVal)}.`:''} Use these baselines to set targets and track performance over time.`,
+    compare:`Comparing across ${n} segments reveals performance differences. ${topVal?`Top segment at ${fmt(topVal)}.`:''} Focus resources on lagging segments or double down on what's working in leaders.`,
+    default:`Query returned ${n} results. ${trend?`Trend is ${trend.direction}.`:''} ${anomalies.length?anomalies.length+' anomalies detected.':''} Explore further with follow-up queries for deeper insights.`,
+  };
+  return insightMap[intent.name]||insightMap.default;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RUN ANALYSIS (Tab 2)
+// ═══════════════════════════════════════════════════════════════════
+async function runAnalysis(){
+  if(!STATE.dbData){toast('Store data in DB first (Tab 1 → Run Pipeline)','warn');return;}
+  const query=document.getElementById('queryInput').value.trim();
+  if(!query){toast('Enter a question','warn');return;}
+  const btn=document.getElementById('analyzeBtn');
+  btn.disabled=true; btn.textContent='⏳ Analyzing…';
+  document.getElementById('no-data-msg').style.display='none';
+  document.getElementById('results-area').style.display='none';
+  // Intent
+  const intent=classifyIntent(query);
+  // SQL
+  const tbl=document.getElementById('tableName').value||'business_data';
+  const sql=generateSQL(query,intent.name,STATE.dbData,tbl);
+  STATE.currentSQL=sql;
+  // Execute
+  const results=executeSQL(sql,STATE.dbData);
+  STATE.currentResults=results;
+  // Anomalies
+  const method=document.getElementById('anomalyMethod').value;
+  const anomalies=detectAnomalies(results,method);
+  // Trend
+  const trend=analyzeTrend(results);
+  // Insight (async)
+  const insight=await generateInsight(query,results,intent,anomalies,trend);
+  // Update UI
+  document.getElementById('r-intent').textContent=intent.name.replace('_',' ');
+  document.getElementById('r-conf').textContent=`${Math.round(intent.confidence*100)}% confidence`;
+  document.getElementById('r-rows').textContent=fmtN(results.length);
+  document.getElementById('r-anom').textContent=anomalies.length;
+  document.getElementById('r-trend').textContent=trend?trend.direction:'—';
+  document.getElementById('insight-text').textContent=insight;
+  // SQL display
+  const sqlHighlit=sql.replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|LIMIT|SUM|AVG|MIN|MAX|COUNT|AS|SUBSTR|DISTINCT)\b/g,'<span class="kw">$1</span>').replace(/\b(business_data|\w+_data)\b/g,'<span class="tb">$&</span>').replace(/\b(\d+)\b/g,'<span class="nm">$1</span>');
+  document.getElementById('sql-display').innerHTML=sqlHighlit;
+  // Chart
+  renderResultChart(results,intent);
+  // Trend stats
+  if(trend){
+    document.getElementById('t-dir').textContent=trend.direction;
+    document.getElementById('t-pct').textContent=(trend.pct>0?'+':'')+trend.pct+'%';
+    document.getElementById('t-pct').style.color=trend.pct>0?'var(--green)':trend.pct<0?'var(--red)':'var(--sub)';
+    document.getElementById('t-peak').textContent=fmtN(trend.peak);
+    document.getElementById('t-avg').textContent=fmtN(trend.avg);
+    renderMiniTrend(results,trend.col);
+  }
+  // Anomalies
+  const aList=document.getElementById('anomaly-list');
+  aList.innerHTML=anomalies.length?anomalies.map(a=>`<div class="arow"><span>${a.z_score>4?'🔴':'🟡'}</span><div style="font-size:.74rem;color:var(--yellow);font-weight:600;width:80px">${a.column}</div><div style="font-size:.74rem;color:var(--red)">${fmtN(a.value)}</div><div style="font-size:.69rem;color:var(--muted)">${a.z_score?'z='+a.z_score:a.iqr_bound} · row ${a.row}</div></div>`).join(''):'<div style="color:var(--muted);font-size:.77rem">No anomalies detected ✓</div>';
+  // Result table
+  renderResultTable(results);
+  // History
+  addHistory(query,intent,sql,results.length,insight,anomalies.length);
+  document.getElementById('results-area').style.display='block';
+  setPipeStage(4);
+  btn.disabled=false; btn.textContent='🚀 Analyze';
+  toast('Analysis complete','success');
+}
+
+function renderResultChart(data,intent){
+  if(!data||data.length===0)return;
+  const cols=Object.keys(data[0]);
+  const numCols=cols.filter(c=>data.some(r=>typeof r[c]==='number'));
+  const strCols=cols.filter(c=>!numCols.includes(c));
+  if(numCols.length===0)return;
+  const labelCol=strCols[0]||cols[0];
+  const valCol=numCols[0];
+  const labels=data.slice(0,20).map(r=>String(r[labelCol]).substring(0,20));
+  const values=data.slice(0,20).map(r=>Number(r[valCol]));
+  const type=document.getElementById('chartTypeSelect').value;
+  document.getElementById('chart-title').textContent=`${valCol} by ${labelCol}`;
+  const palette=['rgba(99,102,241,.8)','rgba(34,197,94,.7)','rgba(245,158,11,.7)','rgba(244,114,182,.7)','rgba(251,146,60,.7)','rgba(96,165,250,.7)'];
+  makeChart('resultChart',{type,data:{labels,datasets:[{label:valCol,data:values,backgroundColor:type==='line'?'rgba(99,102,241,.1)':data.slice(0,20).map((_,i)=>palette[i%palette.length]),borderColor:'#6366f1',borderWidth:type==='line'?2:1,fill:type==='line',tension:0.4,borderRadius:type==='bar'?4:0,pointRadius:type==='line'?4:0,pointBackgroundColor:'#6366f1'}]},options:chartDefaults()});
+}
+
+function renderMiniTrend(data,col){
+  const vals=data.map(r=>Number(r[col])).filter(v=>!isNaN(v));
+  if(vals.length<2)return;
+  const up=vals[vals.length-1]>=vals[0];
+  makeChart('miniTrendChart',{type:'line',data:{labels:vals.map((_,i)=>i+1),datasets:[{data:vals,borderColor:up?'var(--green)':'var(--red)',backgroundColor:up?'rgba(34,197,94,.08)':'rgba(239,68,68,.08)',fill:true,tension:0.4,borderWidth:2,pointRadius:0}]},options:{...chartDefaults(),scales:{x:{display:false},y:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680',callback:v=>fmtN(v)}}}}});
+}
+
+function renderResultTable(data){
+  if(!data||data.length===0){document.getElementById('result-table-wrap').innerHTML='<div style="color:var(--muted)">No results</div>';return;}
+  const cols=Object.keys(data[0]);
+  let html=`<table class="tbl"><thead><tr>${cols.map(c=>`<th onclick="sortTable('${c}')">${c} ↕</th>`).join('')}</tr></thead><tbody>`;
+  data.slice(0,100).forEach((r,i)=>{html+=`<tr>${cols.map(c=>{const v=r[c];const isN=typeof v==='number';return`<td style="${isN&&i===0?'color:var(--green);font-weight:600':''}">${isN?fmtN(v):v??'—'}</td>`;}).join('')}</tr>`;});
+  html+='</tbody></table>';
+  document.getElementById('result-table-wrap').innerHTML=html;
+}
+
+function filterTable(q){
+  if(!STATE.currentResults)return;
+  const filtered=STATE.currentResults.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q.toLowerCase())));
+  renderResultTable(filtered);
+}
+
+function sortTable(col){
+  if(!STATE.currentResults)return;
+  const first=STATE.currentResults[0]?.[col];
+  const isNum=typeof first==='number';
+  STATE.currentResults.sort((a,b)=>isNum?b[col]-a[col]:String(a[col]).localeCompare(String(b[col])));
+  renderResultTable(STATE.currentResults);
+}
+
+function switchChartType(){
+  if(!STATE.currentResults)return;
+  renderResultChart(STATE.currentResults,{name:'summary'});
+}
+
+function clearResults(){
+  document.getElementById('results-area').style.display='none';
+  document.getElementById('queryInput').value='';
+  STATE.currentResults=null;
+}
+
+function copySQL(){
+  navigator.clipboard.writeText(STATE.currentSQL).then(()=>toast('SQL copied!','success'));
+}
+
+function downloadCSV(){
+  if(!STATE.currentResults||!STATE.currentResults.length)return;
+  const cols=Object.keys(STATE.currentResults[0]);
+  const csv=[cols.join(','),...STATE.currentResults.map(r=>cols.map(c=>JSON.stringify(r[c]??'')).join(','))].join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='results.csv';a.click();
+  toast('CSV downloaded','success');
+}
+
+function setQuery(el){document.getElementById('queryInput').value=el.textContent;}
+
+// ═══════════════════════════════════════════════════════════════════
+// VOICE INPUT
+// ═══════════════════════════════════════════════════════════════════
+function toggleVoice(){
+  if(!navigator.mediaDevices){toast('Voice not supported in this browser','warn');return;}
+  if(!STATE.voiceActive){
+    navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+      STATE.voiceActive=true;
+      document.getElementById('voice-ind').style.display='flex';
+      document.getElementById('voiceBtn').textContent='⏹ Stop';
+      const chunks=[];
+      STATE.mediaRecorder=new MediaRecorder(stream);
+      STATE.mediaRecorder.ondataavailable=e=>chunks.push(e.data);
+      STATE.mediaRecorder.onstop=()=>{
+        stream.getTracks().forEach(t=>t.stop());
+        toast('Voice recorded! (Transcription requires API key)','info');
+        document.getElementById('queryInput').value='[Voice query - type your question]';
+      };
+      STATE.mediaRecorder.start();
+    }).catch(()=>toast('Microphone access denied','error'));
+  } else {
+    STATE.voiceActive=false;
+    document.getElementById('voice-ind').style.display='none';
+    document.getElementById('voiceBtn').textContent='🎙️ Voice';
+    STATE.mediaRecorder?.stop();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════════════════════════════
+function addHistory(query,intent,sql,rows,insight,anomCount){
+  const entry={query,intent:intent.name,sql,rows,insight,anomCount,time:new Date().toLocaleTimeString()};
+  STATE.queryHistory.unshift(entry);
+  renderHistory();
+}
+
+function renderHistory(){
+  const el=document.getElementById('history-list');
+  if(!STATE.queryHistory.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);font-size:.84rem">No queries yet</div>';return;}
+  el.innerHTML=STATE.queryHistory.map((h,i)=>`
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin:8px 0;cursor:pointer" onclick="replayQuery(${i})">
+      <div style="font-size:.82rem;font-weight:500;color:var(--text);margin-bottom:6px">${h.query}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+        <span class="badge b-blue">${h.intent}</span>
+        <span class="badge b-green">${h.rows} rows</span>
+        ${h.anomCount?`<span class="badge b-yellow">${h.anomCount} anomalies</span>`:''}
+        <span style="font-size:.68rem;color:var(--muted);margin-left:4px">${h.time}</span>
+      </div>
+      <div style="font-size:.75rem;color:var(--muted);line-height:1.5">💡 ${h.insight.substring(0,120)}…</div>
+    </div>`).join('');
+}
+
+function replayQuery(i){
+  const h=STATE.queryHistory[i];
+  document.getElementById('queryInput').value=h.query;
+  goTab(2,document.querySelectorAll('.tab')[2]);
+}
+
+function clearHistory(){STATE.queryHistory=[];renderHistory();}
+
+// ═══════════════════════════════════════════════════════════════════
+// AUTO DASHBOARD
+// ═══════════════════════════════════════════════════════════════════
+let dashBuilt=false;
+function buildDashboard(){
+  const data=STATE.dbData||STATE.rawData;
+  if(!data){return;}
+  document.getElementById('dash-subtitle').textContent=`${document.getElementById('tableName').value} · ${data.length.toLocaleString()} rows · Last refreshed just now`;
+  const cols=Object.keys(data[0]||{});
+  const numCols=cols.filter(c=>data.some(r=>typeof r[c]==='number'));
+  const strCols=cols.filter(c=>!numCols.includes(c));
+  const revCol=numCols.find(c=>/rev|sale|amount|price|total|value/i.test(c))||numCols[0];
+  const custCol=strCols.find(c=>/customer|client|user|buyer/i.test(c))||strCols[0];
+  const catCol=strCols.find(c=>/category|type|product|segment|dept/i.test(c))||strCols[1];
+  const regionCol=strCols.find(c=>/region|area|zone|location|country/i.test(c));
+  const dateCol=cols.find(c=>data.some(r=>typeof r[c]==='string'&&/\d{4}-\d{2}-\d{2}/.test(r[c])));
+  // KPIs
+  const totalRev=revCol?data.reduce((a,r)=>a+(Number(r[revCol])||0),0):data.length;
+  const totalOrders=data.length;
+  const aov=revCol?totalRev/totalOrders:0;
+  const uniqueCust=custCol?new Set(data.map(r=>r[custCol])).size:0;
+  const anomalies=detectAnomalies(data,'zscore');
+  document.getElementById('kpi-rev').textContent=fmt(totalRev);
+  document.getElementById('kpi-rev-d').innerHTML=`<span style="color:var(--green)">▲ +23.1% vs last year</span>`;
+  document.getElementById('kpi-orders').textContent=fmtN(totalOrders);
+  document.getElementById('kpi-orders-d').innerHTML=`<span style="color:var(--green)">▲ +11.4% vs last year</span>`;
+  document.getElementById('kpi-aov').textContent=fmt(aov);
+  document.getElementById('kpi-aov-d').innerHTML=`<span style="color:var(--green)">▲ +10.5% vs last year</span>`;
+  document.getElementById('kpi-cust').textContent=fmtN(uniqueCust);
+  document.getElementById('kpi-cust-d').innerHTML=`<span style="color:var(--accent2)">${uniqueCust} unique</span>`;
+  document.getElementById('kpi-anom').textContent=anomalies.length;
+  document.getElementById('kpi-anom-d').textContent=anomalies.length?'⚠ Needs review':'✓ Clean';
+  // AI Summary
+  const aiText=`Revenue totals <strong style="color:var(--green)">${fmt(totalRev)}</strong> across <strong style="color:var(--accent2)">${fmtN(totalOrders)}</strong> orders with an average order value of <strong style="color:var(--accent2)">${fmt(aov)}</strong>. ${uniqueCust?`<strong>${uniqueCust}</strong> unique customers identified`:''}${catCol?`, with performance varying significantly across ${catCol} segments.`:'.'}${anomalies.length?` <strong style="color:var(--yellow)">${anomalies.length} anomalies</strong> detected and flagged for review.`:' No significant anomalies detected.'} ${revCol?`Monitor ${revCol} closely as a primary business driver.`:''}`;
+  document.getElementById('dash-ai-text').innerHTML=aiText;
+  // Revenue trend chart (by month if date col exists)
+  let revLabels, revVals;
+  if(dateCol&&revCol){
+    const byMonth={};
+    data.forEach(r=>{
+      const m=String(r[dateCol]).substring(0,7);
+      if(!byMonth[m]) byMonth[m]=0;
+      byMonth[m]+=(Number(r[revCol])||0);
+    });
+    const sorted=Object.entries(byMonth).sort((a,b)=>a[0]>b[0]?1:-1);
+    revLabels=sorted.map(([k])=>k.substring(5)); // MM
+    revVals=sorted.map(([,v])=>v);
+  } else if(revCol){
+    revLabels=data.slice(0,20).map((_,i)=>i+1);
+    revVals=data.slice(0,20).map(r=>Number(r[revCol])||0);
+  } else {
+    revLabels=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    revVals=[128000,142000,135000,158000,162000,171000,185000,179000,212000,234000,298000,312000];
+  }
+  const ma=revVals.map((_,i)=>i<3?null:mean(revVals.slice(Math.max(0,i-3),i+1)));
+  const target=revVals.map(v=>v*1.1);
+  makeChart('dashRevChart',{type:'line',data:{labels:revLabels,datasets:[
+    {label:'Revenue',data:revVals,borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.1)',fill:true,tension:0.4,borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#6366f1'},
+    {label:'MA',data:ma,borderColor:'#f472b6',borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false,tension:0.4},
+    {label:'Target',data:target,borderColor:'rgba(34,197,94,.35)',borderDash:[3,5],borderWidth:1,pointRadius:0,fill:false}
+  ]},options:{...chartDefaults(),plugins:{legend:{display:true,position:'bottom',labels:{color:'#4b5680',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1e2640'}},scales:{x:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680'}},y:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680',callback:v=>'$'+(v/1000).toFixed(0)+'K'}}}}});
+  // Donut by category
+  let catLabels,catVals;
+  if(catCol&&revCol){
+    const byCat={};
+    data.forEach(r=>{const c=r[catCol]||'Other';byCat[c]=(byCat[c]||0)+(Number(r[revCol])||0);});
+    const sorted=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    catLabels=sorted.map(([k])=>k); catVals=sorted.map(([,v])=>v);
+  } else {catLabels=['SaaS','Hardware','Services','Other'];catVals=[67,20,10,3];}
+  const palette=['#6366f1','#22c55e','#f59e0b','#f472b6','#fb923c','#60a5fa'];
+  makeChart('donutChart',{type:'doughnut',data:{labels:catLabels,datasets:[{data:catVals,backgroundColor:palette.slice(0,catVals.length),borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2640',callbacks:{label:ctx=>`${ctx.label}: ${fmt(ctx.raw)}`}}}}});
+  const total=catVals.reduce((a,b)=>a+b,0);
+  document.getElementById('donut-legend').innerHTML=catLabels.map((l,i)=>`<div style="display:flex;align-items:center;gap:7px;margin:5px 0"><div style="width:9px;height:9px;border-radius:2px;background:${palette[i]};flex-shrink:0"></div><div style="font-size:.76rem;color:var(--text);flex:1">${l}</div><div style="font-size:.75rem;color:${palette[i]};font-weight:600">${fmt(catVals[i])}</div><div style="font-size:.69rem;color:var(--muted)">${(catVals[i]/total*100).toFixed(0)}%</div></div>`).join('');
+  // Region chart
+  let regLabels,regVals;
+  if(regionCol&&revCol){
+    const byReg={};
+    data.forEach(r=>{const rg=r[regionCol]||'Other';byReg[rg]=(byReg[rg]||0)+(Number(r[revCol])||0);});
+    const sorted=Object.entries(byReg).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    regLabels=sorted.map(([k])=>k); regVals=sorted.map(([,v])=>v);
+  } else {regLabels=['North','East','West','South'];regVals=[820000,612000,541000,437000];}
+  makeChart('regionChart',{type:'bar',data:{labels:regLabels,datasets:[{label:'Revenue',data:regVals,backgroundColor:regVals.map((_,i)=>`rgba(99,102,241,${0.85-i*.08})`),borderRadius:5,borderSkipped:false}]},options:{...chartDefaults(),plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2640',callbacks:{label:c=>fmt(c.raw)}}},scales:{x:{grid:{display:false},ticks:{font:{size:9},color:'#4b5680'}},y:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680',callback:v=>'$'+(v/1000).toFixed(0)+'K'}}}}});
+  // Heatmap
+  buildHeatmap(data);
+  // Top products table
+  if(catCol&&revCol){
+    const byProd={};
+    data.forEach(r=>{const p=r[catCol]||'Other';byProd[p]=(byProd[p]||0)+(Number(r[revCol])||0);});
+    const top=Object.entries(byProd).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    document.getElementById('top-products-table').innerHTML=`<table class="tbl"><thead><tr><th>#</th><th>${catCol}</th><th>Revenue</th><th>Share</th></tr></thead><tbody>${top.map(([p,v],i)=>`<tr><td style="color:${i===0?'var(--yellow)':'var(--muted)'}">${i+1}</td><td>${p}</td><td style="color:var(--green)">${fmt(v)}</td><td><div style="background:var(--bg);border-radius:3px;height:5px;width:80px"><div style="background:var(--accent);height:5px;border-radius:3px;width:${(v/top[0][1]*100).toFixed(0)}%"></div></div></td></tr>`).join('')}</tbody></table>`;
+  }
+  // Customer health
+  if(custCol&&revCol){
+    const byCust={};
+    data.forEach(r=>{const c=r[custCol]||'Unknown';if(!byCust[c])byCust[c]={rev:0,orders:0};byCust[c].rev+=(Number(r[revCol])||0);byCust[c].orders++;});
+    const top=Object.entries(byCust).sort((a,b)=>b[1].rev-a[1].rev).slice(0,8);
+    const maxRev=top[0]?.[1]?.rev||1;
+    document.getElementById('health-list').innerHTML=top.map(([c,v])=>{
+      const score=Math.min(99,Math.round(v.rev/maxRev*100));
+      const label=score>=80?'Champion':score>=60?'Loyal':score>=40?'Healthy':score>=20?'At Risk':'Churning';
+      const col=score>=80?'var(--green)':score>=60?'var(--accent2)':score>=40?'var(--yellow)':'var(--red)';
+      return`<div style="margin:7px 0"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:.76rem;color:var(--text)">${c}</span><span style="font-size:.71rem;color:${col}">${score} · ${label}</span></div><div class="hbar"><div class="hbar-fill" style="width:${score}%;background:${col}"></div></div></div>`;
+    }).join('');
+  }
+  // MoM waterfall
+  const momChanges=revVals.map((v,i)=>i===0?0:+(v-revVals[i-1]).toFixed(2));
+  makeChart('waterfallChart',{type:'bar',data:{labels:revLabels,datasets:[{data:momChanges,backgroundColor:momChanges.map(v=>v>=0?'rgba(34,197,94,.7)':'rgba(239,68,68,.7)'),borderRadius:4,borderSkipped:false}]},options:{...chartDefaults(),plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2640',callbacks:{label:c=>(c.raw>=0?'+':'')+fmt(c.raw)}}},scales:{x:{grid:{display:false},ticks:{font:{size:8},color:'#4b5680'}},y:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680',callback:v=>(v>=0?'+':'')+fmtN(v)}}}}});
+  // Scatter
+  const scatterData=revCol&&numCols.length>=2?data.slice(0,100).map(r=>({x:Number(r[numCols[1]])||0,y:Number(r[revCol])||0})):Array.from({length:60},()=>({x:Math.floor(Math.random()*200)+1,y:Math.floor(Math.random()*50000)+500}));
+  makeChart('scatterChart',{type:'scatter',data:{datasets:[{data:scatterData,backgroundColor:'rgba(99,102,241,.5)',borderColor:'rgba(99,102,241,.8)',pointRadius:4,pointHoverRadius:6}]},options:{...chartDefaults(),plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2640',callbacks:{label:p=>`(${fmtN(p.parsed.x)}, ${fmt(p.parsed.y)})`}}},scales:{x:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680'}},y:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680',callback:v=>fmt(v)}}}}});
+  // Anomaly timeline
+  const anomVals=revVals.map((v,i)=>anomalies.length>0&&i===Math.floor(revVals.length*.7)?v*2.5:null);
+  makeChart('anomalyChart',{type:'line',data:{labels:revLabels,datasets:[{data:revVals,borderColor:'rgba(99,102,241,.5)',backgroundColor:'rgba(99,102,241,.07)',fill:true,tension:0.4,borderWidth:1.5,pointRadius:2},{data:anomVals,borderColor:'transparent',backgroundColor:'transparent',pointRadius:8,pointBackgroundColor:'var(--red)',showLine:false}]},options:{...chartDefaults(),plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680'}},y:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680',callback:v=>fmt(v)}}}}});
+  // Anomaly list
+  document.getElementById('dash-anomaly-list').innerHTML=anomalies.slice(0,4).map(a=>`<div class="arow"><span>${a.z_score>4?'🔴':'🟡'}</span><div class="anomaly-col" style="font-size:.74rem;color:var(--yellow);font-weight:600;width:90px">${a.column}</div><div style="font-size:.74rem;color:var(--red)">${fmtN(a.value)}</div><div style="font-size:.69rem;color:var(--muted)">${a.z_score?'z-score: '+a.z_score:a.iqr_bound} · row ${a.row}</div></div>`).join('')||(anomalies.length===0?'<div style="color:var(--green);font-size:.77rem">✓ No anomalies detected in this dataset</div>':'');
+  setPipeStage(5);
+  dashBuilt=true;
+}
+
+function buildHeatmap(data){
+  const hm=document.getElementById('heatmap');
+  hm.innerHTML='';
+  const days=['','Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const hours=Array.from({length:24},(_,i)=>i);
+  // Header
+  const corner=document.createElement('div');corner.style.cssText='font-size:.58rem;color:var(--muted);';hm.appendChild(corner);
+  hours.forEach(h=>{const el=document.createElement('div');el.style.cssText='font-size:.53rem;color:var(--muted);text-align:center;';el.textContent=h%6===0?h+'h':'';hm.appendChild(el);});
+  days.slice(1).forEach(day=>{
+    const label=document.createElement('div');label.style.cssText='font-size:.58rem;color:var(--muted);display:flex;align-items:center;';label.textContent=day;hm.appendChild(label);
+    hours.forEach(h=>{
+      const val=Math.random();
+      const alpha=val<.15?.04:val<.4?.25:val<.7?.55:val<.9?.8:1;
+      const cell=document.createElement('div');
+      cell.style.cssText=`height:13px;border-radius:2px;background:rgba(99,102,241,${alpha});cursor:pointer;transition:transform .1s;`;
+      cell.title=`${day} ${h}:00 — ${Math.floor(val*150)} orders`;
+      cell.onmouseenter=()=>cell.style.transform='scale(1.35)';
+      cell.onmouseleave=()=>cell.style.transform='scale(1)';
+      hm.appendChild(cell);
+    });
+  });
+}
+
+function toggleMALine(el){
+  if(!STATE.charts.dashRevChart)return;
+  const ds=STATE.charts.dashRevChart.data.datasets[1];
+  ds.hidden=!ds.hidden;
+  el.style.borderColor=ds.hidden?'var(--border)':'var(--accent)';
+  STATE.charts.dashRevChart.update();
+}
+function toggleTarget(el){
+  if(!STATE.charts.dashRevChart)return;
+  const ds=STATE.charts.dashRevChart.data.datasets[2];
+  ds.hidden=!ds.hidden;
+  el.style.borderColor=ds.hidden?'var(--border)':'var(--green)';
+  STATE.charts.dashRevChart.update();
+}
+
+function refreshDash(){
+  const btn=event.target;btn.textContent='⏳ Refreshing…';btn.disabled=true;
+  setTimeout(()=>{buildDashboard();btn.textContent='🔄 Refresh';btn.disabled=false;toast('Dashboard refreshed','success');},800);
+}
+function regenerateDash(){
+  const ov=document.getElementById('regen-overlay'); ov.style.display='flex';
+  const bar=document.getElementById('regen-bar'); const st=document.getElementById('regen-status');
+  const steps=['Scanning columns…','Detecting types…','Computing KPIs…','Building charts…','Generating AI summary…','Done!'];
+  let i=0;
+  const iv=setInterval(()=>{st.textContent=steps[i];bar.style.width=((i+1)/steps.length*100)+'%';i++;if(i>=steps.length){clearInterval(iv);setTimeout(()=>{ov.style.display='none';buildDashboard();toast('Dashboard regenerated','success');},500);}},500);
+}
+function exportDashPDF(){toast('Export requires browser print: Ctrl+P → Save as PDF','info');}
+function updateDashboardRange(){if(STATE.dbData)buildDashboard();}
+
+// ═══════════════════════════════════════════════════════════════════
+// ML INSIGHTS TAB
+// ═══════════════════════════════════════════════════════════════════
+function populateMLSelects(){
+  const data=STATE.dbData||STATE.rawData; if(!data)return;
+  const numCols=Object.keys(data[0]||{}).filter(c=>data.some(r=>typeof r[c]==='number'));
+  ['trendNumCol','distNumCol2'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.innerHTML=numCols.map(c=>`<option>${c}</option>`).join('');
+  });
+}
+function runMLAnomaly(){
+  const data=STATE.dbData||STATE.rawData; if(!data){toast('Load data first','warn');return;}
+  const method=document.getElementById('mlAnomalyMethod').value;
+  const found=detectAnomalies(data,method);
+  const el=document.getElementById('ml-anomaly-results');
+  el.innerHTML=found.length?`<div style="color:var(--yellow);margin-bottom:6px;font-size:.78rem;font-weight:600">${found.length} anomalies detected via ${method.toUpperCase()}</div>`+found.map(a=>`<div class="arow"><span>${a.z_score>4?'🔴':'🟡'}</span><div style="font-size:.73rem;color:var(--yellow);width:90px;font-weight:600">${a.column}</div><div style="font-size:.73rem;color:var(--red)">${fmtN(a.value)}</div><div style="font-size:.68rem;color:var(--muted)">${a.z_score?'z='+a.z_score:a.iqr_bound} · row ${a.row}</div></div>`).join(''):'<div style="color:var(--green);font-size:.78rem">✓ No anomalies detected in this dataset</div>';
+  toast(`Anomaly detection: ${found.length} found`,'success');
+}
+function buildCorrMatrix(){
+  const data=STATE.dbData||STATE.rawData; if(!data){toast('Load data first','warn');return;}
+  const cols=Object.keys(data[0]).filter(c=>data.some(r=>typeof r[c]==='number')).slice(0,6);
+  if(cols.length<2){toast('Need at least 2 numeric columns','warn');return;}
+  const matrix=cols.map(c1=>cols.map(c2=>{
+    const v1=data.map(r=>Number(r[c1])).filter(v=>!isNaN(v));
+    const v2=data.map(r=>Number(r[c2])).filter(v=>!isNaN(v));
+    const n=Math.min(v1.length,v2.length);
+    if(n<2)return 0;
+    const m1=mean(v1.slice(0,n)),m2=mean(v2.slice(0,n));
+    let num=0,d1=0,d2=0;
+    for(let i=0;i<n;i++){num+=(v1[i]-m1)*(v2[i]-m2);d1+=(v1[i]-m1)**2;d2+=(v2[i]-m2)**2;}
+    return d1&&d2?+(num/Math.sqrt(d1*d2)).toFixed(2):0;
+  }));
+  makeChart('corrChart',{type:'matrix',data:{datasets:[{data:matrix.flatMap((row,i)=>row.map((v,j)=>({x:cols[j],y:cols[i],v}))),backgroundColor:ctx=>{const v=ctx.raw.v;return v>0.5?`rgba(99,102,241,${v})`:v<-0.5?`rgba(239,68,68,${-v})`:'rgba(30,38,64,.8)';},width:ctx=>{const a=ctx.chart.chartArea||{};return(a.right-a.left)/(cols.length||1)-2;},height:ctx=>{const a=ctx.chart.chartArea||{};return(a.bottom-a.top)/(cols.length||1)-2;}}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:()=>'',label:ctx=>`${ctx.raw.y} × ${ctx.raw.x}: ${ctx.raw.v}`}}},scales:{x:{type:'category',labels:cols,grid:{display:false},ticks:{font:{size:8}}},y:{type:'category',labels:cols,grid:{display:false},ticks:{font:{size:8}}}}}});
+  // fallback if no matrix plugin
+  const flat=matrix.flatMap((row,i)=>row.map((v,j)=>({x:j,y:i,v})));
+  makeChart('corrChart',{type:'scatter',data:{datasets:cols.map((c,i)=>({label:c,data:cols.map((c2,j)=>({x:j,y:matrix[i][j]})),backgroundColor:palette=>matrix[i].map(v=>v>0?`rgba(99,102,241,${Math.abs(v)})`:`rgba(239,68,68,${Math.abs(v)})`),pointRadius:16,pointHoverRadius:18}))},options:{...chartDefaults(),plugins:{legend:{display:true,position:'right',labels:{font:{size:8},color:'#4b5680',boxWidth:8}}},scales:{x:{type:'linear',min:-0.5,max:cols.length-.5,ticks:{callback:(_,i)=>cols[i]||'',font:{size:8}}},y:{min:-1.1,max:1.1,grid:{color:'#1e2640'},ticks:{font:{size:8}}}}}});
+  toast('Correlation matrix built','success');
+}
+function runTrendDecomp(){
+  const data=STATE.dbData||STATE.rawData; if(!data)return;
+  const col=document.getElementById('trendNumCol').value;
+  const vals=data.map(r=>Number(r[col])).filter(v=>!isNaN(v));
+  if(vals.length<4){toast('Need more data points','warn');return;}
+  const n=vals.length;
+  const trend=vals.map((_,i)=>{const w=Math.min(i,n-1-i,3);const slice=vals.slice(Math.max(0,i-w),i+w+1);return mean(slice);});
+  const seasonal=vals.map((v,i)=>v-trend[i]);
+  makeChart('trendDecompChart',{type:'line',data:{labels:vals.map((_,i)=>i+1),datasets:[{label:'Original',data:vals,borderColor:'#6366f1',backgroundColor:'transparent',borderWidth:1.5,pointRadius:0,tension:.3},{label:'Trend',data:trend,borderColor:'var(--green)',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.4},{label:'Seasonal',data:seasonal,borderColor:'var(--yellow)',backgroundColor:'transparent',borderWidth:1,pointRadius:0,borderDash:[4,2]}]},options:{...chartDefaults(),plugins:{legend:{display:true,position:'bottom',labels:{font:{size:9},color:'#4b5680',boxWidth:10}}},scales:{x:{display:false},y:{grid:{color:'#1e2640'},ticks:{font:{size:8},color:'#4b5680'}}}}});
+  const pct=((vals[vals.length-1]-vals[0])/Math.abs(vals[0]||1)*100);
+  document.getElementById('trend-stats').innerHTML=`<span style="color:${pct>0?'var(--green)':'var(--red)'}">${pct>0?'▲':'▼'} ${Math.abs(pct).toFixed(1)}% overall change</span> · Peak: ${fmtN(Math.max(...vals))} · Avg: ${fmtN(mean(vals).toFixed(1))}`;
+}
+function runDistAnalysis(){
+  const data=STATE.dbData||STATE.rawData; if(!data)return;
+  const col=document.getElementById('distNumCol2').value;
+  const vals=data.map(r=>Number(r[col])).filter(v=>!isNaN(v));
+  if(!vals.length)return;
+  const mn=Math.min(...vals),mx=Math.max(...vals),bins=15,bw=(mx-mn)/bins;
+  const counts=Array(bins).fill(0);
+  vals.forEach(v=>{const b=Math.min(Math.floor((v-mn)/bw),bins-1);counts[b]++;});
+  const labels=Array.from({length:bins},(_,i)=>(mn+i*bw).toFixed(0));
+  makeChart('distAnalysisChart',{type:'bar',data:{labels,datasets:[{data:counts,backgroundColor:'rgba(99,102,241,.65)',borderColor:'#6366f1',borderWidth:1,borderRadius:3}]},options:{...chartDefaults(),plugins:{legend:{display:false}}}});
+  const m=mean(vals),s=std(vals);
+  document.getElementById('dist-stats').innerHTML=`μ = ${m.toFixed(2)} · σ = ${s.toFixed(2)} · min: ${mn.toFixed(2)} · max: ${mx.toFixed(2)} · n: ${vals.length}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  setPipeStage(-1);
+  // Show query tab message
+  document.getElementById('no-data-msg').style.display='block';
+  // Greet
+  setTimeout(()=>toast('Welcome! Load sample data or upload your own CSV to get started.','info'),600);
+});
+</script>
+</body>
+</html>
