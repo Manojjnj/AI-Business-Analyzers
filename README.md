@@ -33,7 +33,7 @@ AI Business/
 
 ---
 
-## 🚀 How to Run https://github.com/Manojjnj/AI-Business-Analyzers.git
+## 🚀 How to Run file:///C:/Users/Manoj%20.J/data%20cleaning%20project/AI%20Business/AI.html
 
 1. Clone the repository:
 
